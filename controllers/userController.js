@@ -14,7 +14,6 @@ var Member = require('../models/members');
 var Team = require('../models/teams');
 var Invoice = require('../models/invoice');
 var Expense = require('../models/expenses');
-const pettyCash = require('../models/pettyCash');
 
 exports.register = async (req, res, next) => {
 	var exists = await User.findOne({
@@ -50,15 +49,6 @@ exports.register = async (req, res, next) => {
 		}
 	}
 };
-
-exports.signIn = asyncHandler(async (req, res) => {
-	let token = authenticate.getToken({ _id: req.user._id });
-	res.status(200).json({
-		success: true,
-		token: token,
-		user: req.user._id,
-	});
-});
 
 exports.signIn = asyncHandler(async (req, res) => {
 	let token = authenticate.getToken({ _id: req.user._id });
@@ -229,6 +219,18 @@ exports.getAllMembers = asyncHandler(async (req, res) => {
 	res.status(200).json({ members });
 });
 
+exports.getMembersByTeam = asyncHandler(async (req, res) => {
+	const members = await Member.find({
+		user: req.user._id,
+		team: req.params.id,
+	}).populate('package');
+	var total = 0;
+	for (let index = 0; index < members.length; index++) {
+		total += members[index].package.price;
+	}
+	res.status(200).json({ member: members.length, rate: total });
+});
+
 exports.editMember = asyncHandler(async (req, res) => {
 	await Member.findByIdAndUpdate(req.params.id, {
 		...req.body,
@@ -277,14 +279,13 @@ exports.addInvoice = asyncHandler(async (req, res) => {
 
 exports.getSingleInvoice = asyncHandler(async (req, res) => {
 	const invoice = await Invoice.findById(req.params.id).populate('team');
-	res.status(200).json({ invoice }).populate('team');
+	res.status(200).json({ invoice });
 });
 
 exports.getAllInvoices = asyncHandler(async (req, res) => {
 	const invoices = await Invoice.find({ user: req.user._id }).populate(
 		'team'
 	);
-
 	res.status(200).json({ invoices });
 });
 
@@ -490,6 +491,11 @@ exports.getTotalCash = asyncHandler(async (req, res) => {
 exports.getInvoiceGraph = asyncHandler(async (req, res) => {
 	const data = await Invoice.aggregate([
 		{
+			$match: {
+				user: req.user._id,
+			},
+		},
+		{
 			$group: {
 				_id: {
 					month: { $month: '$date' },
@@ -518,6 +524,84 @@ exports.getEnergyGraph = asyncHandler(async (req, res) => {
 	const month = new Date().getMonth();
 	const targetMonth = req.query.month ? JSON.parse(req.query.month) : month;
 	const data = await Energy.aggregate([
+		// {
+		// 	$match: {
+		// 		date: {
+		// 			$gte: new Date(year, targetMonth, 1),
+		// 			$lt: new Date(year, targetMonth + 1, 1),
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	$sort: { date: 1 }, // Sort the documents by date in ascending order
+		// },
+		// {
+		// 	$group: {
+		// 		_id: {
+		// 			year: { $year: '$date' },
+		// 			month: { $month: '$date' },
+		// 			day: { $dayOfMonth: '$date' },
+		// 		},
+		// 		readings: { $push: '$reading' }, // Store all readings of the day in an array
+		// 	},
+		// },
+		// {
+		// 	$sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }, // Sort by date in ascending order
+		// },
+		// {
+		// 	$project: {
+		// 		_id: 0,
+		// 		date: {
+		// 			$dateFromParts: {
+		// 				year: '$_id.year',
+		// 				month: '$_id.month',
+		// 				day: '$_id.day',
+		// 			},
+		// 		},
+		// 		readings: 1,
+		// 	},
+		// },
+		// {
+		// 	$lookup: {
+		// 		from: 'energy', // Replace 'energy' with the actual collection name of Energy
+		// 		let: { nextDay: { $add: ['$date', 86400000] } }, // Add 1 day (in milliseconds) to the current date to find the next day
+		// 		pipeline: [
+		// 			{
+		// 				$match: {
+		// 					date: { $eq: { $toDate: '$$nextDay' } }, // Match documents with date equal to the next day
+		// 				},
+		// 			},
+		// 			{ $limit: 1 }, // Limit to the first document found (next day's reading)
+		// 			{ $project: { _id: 0, reading: 1 } }, // Only include the reading field
+		// 		],
+		// 		as: 'nextDayReading', // Store the result in the 'nextDayReading' field
+		// 	},
+		// },
+		// {
+		// 	$project: {
+		// 		date: 1,
+		// 		difference: {
+		// 			$cond: [
+		// 				{ $ne: ['$readings', []] }, // Check if the array is not empty
+		// 				{
+		// 					$subtract: [
+		// 						{ $arrayElemAt: ['$readings', 0] },
+		// 						{
+		// 							$arrayElemAt: [
+		// 								'$nextDayReading.reading',
+		// 								0,
+		// 							],
+		// 						}, // Reading of the first document of the next day
+		// 					],
+		// 				},
+		// 				null,
+		// 			],
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	$sort: { date: 1 }, // Sort the results by date in ascending order
+		// },
 		{
 			$match: {
 				date: {
@@ -527,7 +611,7 @@ exports.getEnergyGraph = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			$sort: { date: 1 },
+			$sort: { date: 1 }, // Sort the documents by date in ascending order
 		},
 		{
 			$group: {
@@ -536,52 +620,23 @@ exports.getEnergyGraph = asyncHandler(async (req, res) => {
 					month: { $month: '$date' },
 					day: { $dayOfMonth: '$date' },
 				},
-				firstReading: { $first: '$reading' },
-				lastReading: { $last: '$reading' },
+				firstReading: { $first: '$reading' }, // Reading of the first document of the day
 			},
 		},
 		{
-			$project: {
-				_id: 0,
-				date: {
-					$dateToParts: {
-						date: {
-							$dateFromString: {
-								dateString: {
-									$concat: [
-										{ $toString: '$_id.year' },
-										{
-											$toString: {
-												$cond: [
-													{ $lte: ['$_id.month', 9] },
-													'0',
-													'',
-												],
-											},
-										},
-										{ $toString: '$_id.month' },
-										{
-											$toString: {
-												$cond: [
-													{ $lte: ['$_id.day', 9] },
-													'0',
-													'',
-												],
-											},
-										},
-										{ $toString: '$_id.day' },
-									],
-								},
-							},
-						},
-					},
-				},
-				difference: { $subtract: ['$lastReading', '$firstReading'] },
-			},
-		},
-		{
-			$sort: { date: 1 },
+			$sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }, // Sort by date in ascending order
 		},
 	]);
-	res.status(200).json(data);
+	var finalData = [];
+	for (let index = 0; index < data.length - 1; index++) {
+		if (data[index]._id.day + 1 === data[index + 1]._id.day) {
+			var obj = {
+				day: data[index]._id.day,
+				reading:
+					data[index + 1].firstReading - data[index].firstReading,
+			};
+			finalData.push(obj);
+		}
+	}
+	res.status(200).json({ data: finalData });
 });

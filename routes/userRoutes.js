@@ -153,6 +153,11 @@ router.get(
 	authenticate.verifyUser,
 	userController.getAllMembers
 );
+router.get(
+	'/member/team/:id',
+	authenticate.verifyUser,
+	userController.getMembersByTeam
+);
 router.post('/member/add', authenticate.verifyUser, userController.addMember);
 router.patch(
 	'/member/edit/:id',

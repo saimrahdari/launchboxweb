@@ -12,6 +12,7 @@ var ErrorHandler = require('./utils/error');
 var connection = require('./utils/connection');
 
 var User = require('./routes/userRoutes');
+var Admin = require('./routes/adminRoutes');
 
 app.listen(process.env.PORT, () => {
 	console.log(`Running on port ${process.env.PORT} 👍.`);
@@ -34,6 +35,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use('/user', User);
+app.use('/admin', Admin);
 
 app.all('*', (req, res, next) => {
 	next(new ErrorHandler('Bad Request', 404));
