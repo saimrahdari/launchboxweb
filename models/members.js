@@ -5,11 +5,6 @@ var Member = new Schema(
 	{
 		name: { type: String, required: true, trim: true },
 		team: { type: mongoose.Types.ObjectId, ref: 'Team', required: true },
-		package: {
-			type: mongoose.Types.ObjectId,
-			ref: 'Package',
-			required: true,
-		},
 		status: { type: Boolean, default: true },
 		user: { type: mongoose.Types.ObjectId, ref: 'User' },
 	},

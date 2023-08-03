@@ -96,12 +96,14 @@ exports.getMembersByTeam = asyncHandler(async (req, res) => {
 	const members = await Member.find({
 		user: req.body.u_id,
 		team: req.body.t_id,
-	}).populate('package');
+	});
 	var total = 0;
-	for (let index = 0; index < members.length; index++) {
-		total += members[index].package.price;
+	if (members.length > 0) {
+		const team = await Team.findById(req.body.t_id).populate('package');
+		total += team.package.price * members.length;
+		return res.status(200).json({ total, members: members.length });
 	}
-	res.status(200).json({ member: members.length, rate: total });
+	res.status(200).json({ members: 0, total });
 });
 
 exports.addMember = asyncHandler(async (req, res) => {
@@ -110,9 +112,7 @@ exports.addMember = asyncHandler(async (req, res) => {
 });
 
 exports.getSingleMember = asyncHandler(async (req, res) => {
-	const member = await Member.findById(req.params.id).populate(
-		'team package user'
-	);
+	const member = await Member.findById(req.params.id).populate('team user');
 	res.status(200).json({ member });
 });
 
@@ -122,7 +122,7 @@ exports.getAllMembers = asyncHandler(async (req, res) => {
 	const totalItems = await Member.countDocuments();
 	const totalPages = Math.ceil(totalItems / perPage);
 	const members = await Member.find()
-		.populate('team package user')
+		.populate('team user')
 		.skip((page - 1) * perPage)
 		.limit(perPage);
 	res.status(200).json({
@@ -380,7 +380,7 @@ exports.addTeam = asyncHandler(async (req, res) => {
 });
 
 exports.getSingleTeam = asyncHandler(async (req, res) => {
-	const team = await Team.findById(req.params.id).populate('user');
+	const team = await Team.findById(req.params.id).populate('user package');
 	res.status(200).json({ team });
 });
 
@@ -390,7 +390,7 @@ exports.getAllTeams = asyncHandler(async (req, res) => {
 	const totalItems = await Team.countDocuments();
 	const totalPages = Math.ceil(totalItems / perPage);
 	const teams = await Team.find({})
-		.populate('user')
+		.populate('user package')
 		.skip((page - 1) * perPage)
 		.limit(perPage);
 	res.status(200).json({

@@ -205,16 +205,12 @@ exports.addMember = asyncHandler(async (req, res) => {
 });
 
 exports.getSingleMember = asyncHandler(async (req, res) => {
-	const member = await Member.findById(req.params.id).populate(
-		'team package'
-	);
+	const member = await Member.findById(req.params.id).populate('team');
 	res.status(200).json({ member });
 });
 
 exports.getAllMembers = asyncHandler(async (req, res) => {
-	const members = await Member.find({ user: req.user._id }).populate(
-		'team package'
-	);
+	const members = await Member.find({ user: req.user._id }).populate('team');
 
 	res.status(200).json({ members });
 });
@@ -223,12 +219,14 @@ exports.getMembersByTeam = asyncHandler(async (req, res) => {
 	const members = await Member.find({
 		user: req.user._id,
 		team: req.params.id,
-	}).populate('package');
+	});
 	var total = 0;
-	for (let index = 0; index < members.length; index++) {
-		total += members[index].package.price;
+	if (members.length > 0) {
+		const team = await Team.findById(req.params.id).populate('package');
+		total += team.package.price * members.length;
+		return res.status(200).json({ total, members: members.length });
 	}
-	res.status(200).json({ member: members.length, rate: total });
+	res.status(200).json({ members: 0, total });
 });
 
 exports.editMember = asyncHandler(async (req, res) => {
@@ -250,12 +248,12 @@ exports.addTeam = asyncHandler(async (req, res) => {
 });
 
 exports.getSingleTeam = asyncHandler(async (req, res) => {
-	const team = await Team.findById(req.params.id);
+	const team = await Team.findById(req.params.id).populate('package');
 	res.status(200).json({ team });
 });
 
 exports.getAllTeams = asyncHandler(async (req, res) => {
-	const teams = await Team.find({ user: req.user._id });
+	const teams = await Team.find({ user: req.user._id }).populate('package');
 	res.status(200).json({ teams });
 });
 
